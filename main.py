@@ -3,12 +3,11 @@ Alipay Quant System — 主入口
 参考: Qlib (流水线) + Freqtrade (多模式) + Superpowers (TDD)
 
 运行模式:
+  python main.py precache                     # 周末预热: 下载全量C类基金净值+胜率
   python main.py recommend                    # 热门板块→基金筛选→回测→推荐报告
   python main.py recommend --type industry    # 按行业板块扫描
-  python main.py recommend --boards 3 --funds 5 --output report.json
   python main.py backtest --fund 005844 --strategy ma --days 252
   python main.py advisor                      # 14:30 场内研判
-  python main.py advisor --notify             # 14:30 研判 + Telegram推送
   python main.py test                         # 运行所有测试
 """
 import sys
@@ -111,6 +110,12 @@ def print_result(result: dict):
             print(f"  {t['date']} {t['action']:4s} ¥{t.get('cost', t.get('value', 0)):.0f} {t.get('reason', '')[:40]}")
 
 
+def cmd_precache(args):
+    """预缓存命令: 周末提前下载全量C类基金净值+胜率"""
+    from tools.precache import precache
+    precache()
+
+
 def cmd_recommend(args):
     """推荐命令: 热门板块→基金筛选→回测→推荐报告"""
     config = load_config()
@@ -197,6 +202,9 @@ def main():
     p_advisor = subparsers.add_parser("advisor", help="14:30 场内研判")
     p_advisor.add_argument("--notify", action="store_true", help="同时推送 Telegram")
 
+    # precache
+    p_pre = subparsers.add_parser("precache", help="周末预热: 下载全量C类基金净值+胜率")
+
     # recommend
     p_rec = subparsers.add_parser("recommend", help="热门板块→基金筛选→回测→推荐报告")
     p_rec.add_argument("--type", default="concept", choices=["concept", "industry"],
@@ -211,7 +219,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "recommend":
+    if args.command == "precache":
+        cmd_precache(args)
+    elif args.command == "recommend":
         cmd_recommend(args)
     elif args.command == "backtest":
         cmd_backtest(args)

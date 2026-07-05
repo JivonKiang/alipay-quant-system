@@ -35,10 +35,13 @@ jobs:
         run: pip install pyyaml requests
 
       # 尝试运行推荐引擎获取最新数据
-      # 交易时段 API 可用 → 更新 output/recommendation.json
-      # 非交易时段 API 失败 → 使用仓库中已有的 output/recommendation.json（缓存）
-      - name: Run Recommendation Engine
+      # 如果已有预缓存 (precached_funds.json)，跳过API直接用缓存胜率
+      # 如果 API 失败，使用仓库中已有的 output/recommendation.json
+      - name: Run Recommendation Engine (with precache)
         run: |
+          if [ -f output/precached_funds.json ]; then
+            echo "[INFO] 发现预缓存，使用缓存胜率数据"
+          fi
           python main.py recommend --output output/recommendation.json || echo "API unavailable, using cached report"
         continue-on-error: true
 
