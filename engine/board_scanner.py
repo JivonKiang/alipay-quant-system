@@ -6,7 +6,6 @@ Board Scanner — 板块热度扫描器
 import json
 import time
 import math
-import urllib.request
 from datetime import datetime
 from typing import List, Dict, Tuple
 
@@ -18,15 +17,26 @@ class BoardScanner:
         self.config = config or {}
         self.headers = {
             "Referer": "https://quote.eastmoney.com/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Connection": "keep-alive",
         }
         self.base_url = "https://push2.eastmoney.com/api/qt/clist/get"
         self.kline_url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
 
     def _fetch_json(self, url: str) -> Dict:
-        req = urllib.request.Request(url, headers=self.headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read())
+        try:
+            import requests
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            # fallback to urllib
+            import urllib.request
+            req = urllib.request.Request(url, headers=self.headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read())
 
     def fetch_all_boards(self, board_type: str = "concept") -> List[Dict]:
         """

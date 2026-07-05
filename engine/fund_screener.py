@@ -6,7 +6,6 @@ import json
 import re
 import time
 import math
-import urllib.request
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -18,7 +17,10 @@ class FundScreener:
         self.config = config or {}
         self.headers = {
             "Referer": "https://fund.eastmoney.com/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Connection": "keep-alive",
         }
         # 板块→关键词映射 (用于基金名称匹配)
         self.board_keywords = {
@@ -51,14 +53,28 @@ class FundScreener:
         }
 
     def _fetch_json(self, url: str) -> Dict:
-        req = urllib.request.Request(url, headers=self.headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read())
+        try:
+            import requests
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            import urllib.request
+            req = urllib.request.Request(url, headers=self.headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read())
 
     def _fetch_text(self, url: str) -> str:
-        req = urllib.request.Request(url, headers=self.headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return resp.read().decode("utf-8")
+        try:
+            import requests
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            resp.raise_for_status()
+            return resp.text
+        except Exception:
+            import urllib.request
+            req = urllib.request.Request(url, headers=self.headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.read().decode("utf-8")
 
     def fetch_fund_list(self) -> List[Dict]:
         """
