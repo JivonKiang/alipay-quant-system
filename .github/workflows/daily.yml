@@ -1,0 +1,108 @@
+name: Daily Quant Operations
+
+on:
+  schedule:
+    # 11:00 数据更新
+    - cron: '0 3 * * 1-5'
+    # 13:30 数据更新
+    - cron: '30 5 * * 1-5'
+    # 14:30 场内研判
+    - cron: '30 6 * * 1-5'
+    # 收盘后 15:30 复盘
+    - cron: '30 7 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      command:
+        description: '运行命令 (backtest/advisor/test)'
+        required: true
+        default: 'advisor'
+      fund:
+        description: '基金代码 (backtest用)'
+        required: false
+        default: '005844'
+      strategy:
+        description: '策略 (backtest用)'
+        required: false
+        default: 'ma'
+
+jobs:
+  # ========== 14:30 场内研判 ==========
+  afternoon-advisor:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '30 6 * * 1-5' || (github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'advisor')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Afternoon Advisor
+        run: python main.py advisor --notify
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/afternoon_advice.json output/advice_history.json 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "auto: afternoon advisor $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M')"
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          publish_branch: gh-pages
+
+  # ========== 回测任务 ==========
+  backtest:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'backtest'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Backtest
+        run: |
+          python main.py backtest \
+            --fund ${{ github.event.inputs.fund }} \
+            --strategy ${{ github.event.inputs.strategy }} \
+            --days 252
+
+  # ========== 测试任务 ==========
+  test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.command == 'test'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Tests
+        run: python main.py test

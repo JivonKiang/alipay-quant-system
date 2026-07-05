@@ -1,0 +1,124 @@
+# Alipay Quant System 配置
+# 参考: Qlib (AI量化平台) + Freqtrade (ML交易机器人) + Jesse (零偏差回测)
+
+system:
+  name: "Alipay Quant System"
+  version: "1.0.0"
+  timezone: "Asia/Shanghai"
+
+# 资金配置 (来自 portfolio.py)
+capital:
+  total_flexible: 96000       # 灵活资金 (元)
+  total_money_fund: 50000     # 货币基金 (元)
+  single_trade_max: 5000      # 单次买入上限 (元)
+  single_fund_max_pct: 0.20   # 单基金仓位上限 (20%)
+  max_concurrent_signals: 2   # 同时最多执行信号数
+
+# C类基金费率配置 (参考 quick_money.py 门控1)
+fee:
+  # 默认C类: 7天后免赎回费
+  default_lock_days: 7
+  fee_schedule:
+    - { max_days: 6,  rate: 0.015, label: "1.5%", severity: "BLOCK" }
+    - { max_days: 29, rate: 0.005, label: "0.5%", severity: "WARN" }
+    - { max_days: 9999, rate: 0.0, label: "0%", severity: "OK" }
+  # 特殊C类基金: 30天锁定 (手动维护)
+  custom_lock_days:
+    # 格式: "基金代码": 锁定天数
+    # 示例: "012345": 30
+
+# 风控参数 (参考 trading_system.py)
+risk:
+  stop_loss_pct: -0.08           # 止损线 -8%
+  take_profit_short_pct: 0.12    # 短线止盈 +12%
+  take_profit_trend_pct: 0.18    # 趋势止盈 +18%
+  trailing_stop_drop_pct: 0.05   # 移动止盈: 高点回撤 >5%
+  min_hold_for_stop: 7           # 最少持有7天才执行止损
+  board_weak_threshold: -0.02    # 板块走弱阈值 -2%
+
+# 动态仓位 (市场环境驱动)
+position_sizing:
+  bull:    { amount: 5000, label: "牛市" }
+  bull_lean: { amount: 4000, label: "偏多" }
+  range:   { amount: 3000, label: "震荡" }
+  bear_lean: { amount: 2000, label: "偏熊" }
+  bear:    { amount: 1000, label: "熊市" }
+
+# 数据源配置
+data:
+  # 东方财富 (主要)
+  eastmoney:
+    kline_url: "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+    snapshot_url: "https://push2.eastmoney.com/api/qt/stock/get"
+    ulist_url: "https://push2.eastmoney.com/api/qt/ulist.np/get"
+    clist_url: "https://push2.eastmoney.com/api/qt/clist/get"
+  # 天天基金 (基金净值)
+  ttjj:
+    nav_url: "https://api.fund.eastmoney.com/f10/lsjz"
+    estimate_url: "https://fundgz.1234567.com.cn/js"
+  # 新浪 (备用)
+  sina:
+    nav_url: "https://stock.finance.sina.com.cn/fundInfo/api/openapi.php/CaihuiFundInfoService.getNav"
+
+# 监控板块 (25个高波动板块, 与 quick_money.py 一致)
+boards:
+  科创芯片:     "90.BK0977"
+  存储芯片:     "90.BK1093"
+  PCB:         "90.BK0734"
+  CPO代理:     "90.BK1120"
+  AI算力链:    "90.BK1157"
+  消费电子:     "90.BK0815"
+  半导体链:     "90.BK0735"
+  光刻胶:       "90.BK1049"
+  汽车芯片:     "90.BK1114"
+  第三代半导体: "90.BK1080"
+  卫星通信:     "90.BK1181"
+  AIGC:        "90.BK1158"
+  华为概念:     "90.BK0808"
+  苹果概念:     "90.BK0842"
+  锂电池:       "90.BK0493"
+  光伏:         "90.BK0526"
+  风电:         "90.BK0528"
+  新能源车:     "90.BK0477"
+  机器人:       "90.BK0733"
+  军工:         "90.BK0481"
+  创新药:       "90.BK0621"
+  中药:         "90.BK0616"
+  证券:         "90.BK0473"
+  稀土:         "90.BK0744"
+  铜:           "90.BK0478"
+  黄金股:       "90.BK1166"
+
+# 五大核心指数
+indexes:
+  上证50:   "1.000016"
+  沪深300:  "1.000300"
+  中证500:  "1.000905"
+  创业板指: "0.399006"
+  科创50:   "1.000688"
+
+# 14:30 研判配置
+advisor:
+  # 触发时间 (24小时制)
+  trigger_time: "14:30"
+  # 估值偏差容忍度 (%)
+  estimate_tolerance: 0.02
+  # 日内涨跌幅异常阈值 (相对于20日波动率)
+  volatility_zscore_threshold: 1.5
+  # 输出格式
+  output_format: "json"   # json | markdown | both
+
+# Telegram Bot 配置 (可选)
+telegram:
+  enabled: false
+  bot_token: ""           # 从 @BotFather 获取
+  chat_id: ""             # 你的 Telegram ID
+  # 推送级别: all | critical | none
+  push_level: "critical"
+
+# 回测配置
+backtest:
+  default_period_days: 252   # 默认回测1年
+  commission_rate: 0.00015   # 申购费 0.015%
+  slippage: 0.001            # 滑点 0.1%
+  initial_capital: 100000    # 初始资金
