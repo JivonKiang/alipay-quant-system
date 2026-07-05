@@ -3,17 +3,14 @@ name: Deploy Report to GitHub Pages
 on:
   push:
     branches: [main]
-  # 自动运行：每天 11:00/14:30/22:00 各跑一次
-  # 11:00 = 09:00 UTC (北京时间)
-  # 14:30 = 06:30 UTC (北京时间 14:30)
-  # 22:00 = 14:00 UTC (北京时间 22:00)
+  # 自动运行：北京时间每天 09:00 / 14:30 / 22:00
   schedule:
     - cron: "0 1,6,14 * * *"
   workflow_dispatch:
 
 # 权限设置
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -38,22 +35,12 @@ jobs:
         run: pip install pyyaml
 
       # 尝试运行推荐引擎获取最新数据
-      # 交易时段 API 可用 -> 更新缓存
-      # 非交易时段 API 失败 -> 使用仓库中已有的 output/recommendation.json
+      # 交易时段 API 可用 → 更新 output/recommendation.json
+      # 非交易时段 API 失败 → 使用仓库中已有的 output/recommendation.json（缓存）
       - name: Run Recommendation Engine
-        id: recommend
         run: |
-          python main.py recommend --output output/recommendation.json && echo "success=true" >> $GITHUB_OUTPUT || echo "success=false" >> $GITHUB_OUTPUT
+          python main.py recommend --output output/recommendation.json || echo "API unavailable, using cached report"
         continue-on-error: true
-
-      # 如果推荐引擎成功，将更新的 JSON 提交回仓库（持久化缓存）
-      - name: Commit updated report cache
-        if: steps.recommend.outputs.success == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add output/recommendation.json
-          git diff --cached --quiet || (git commit -m "chore: auto-update report cache [$(date +%Y-%m-%d)]" && git push)
 
       - name: Generate HTML Report
         run: python tools/generate_report_html.py --input output/recommendation.json --output output/index.html
