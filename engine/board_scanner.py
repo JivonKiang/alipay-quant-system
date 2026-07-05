@@ -53,6 +53,7 @@ class BoardScanner:
 
         all_boards = []
         page = 1
+        has_error = False
         while True:
             url = (
                 f"{self.base_url}?"
@@ -84,9 +85,44 @@ class BoardScanner:
                 time.sleep(0.3)
             except Exception as e:
                 print(f"[WARN] 板块扫描失败(p{page}): {e}")
+                has_error = True
                 break
 
+        # Fallback: 如果API失败，尝试从上次缓存中读取
+        if not all_boards:
+            cached = self._load_cached_boards(board_type)
+            if cached:
+                print(f"[INFO] 使用缓存板块数据 ({len(cached)} 个板块)")
+                return cached
+
         return all_boards
+
+    def _load_cached_boards(self, board_type: str) -> List[Dict]:
+        """从 output/recommendation.json 缓存中读取上次成功的板块数据"""
+        try:
+            import os
+            cache_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output", "recommendation.json")
+            if not os.path.exists(cache_path):
+                return []
+            with open(cache_path, "r", encoding="utf-8") as f:
+                cached_report = json.load(f)
+            if "error" in cached_report:
+                return []
+            boards = []
+            for b in cached_report.get("hot_boards", []):
+                boards.append({
+                    "code": "",  # 缓存中不保存code
+                    "name": b["name"],
+                    "change_pct": b.get("change_pct", 0),
+                    "main_flow": 0,
+                    "main_flow_pct": b.get("main_flow_pct", 0),
+                    "leader_name": "",
+                    "up_count": 0,
+                    "cached": True,
+                })
+            return boards
+        except Exception:
+            return []
 
     def fetch_board_kline(self, board_code: str, days: int = 20) -> List[Dict]:
         """获取板块近期K线用于连续性分析"""
@@ -178,7 +214,7 @@ class BoardScanner:
             score_flow = min(100, max(0, 50 + flow_pct * 10))  # 1%=60分
 
             # 3. 连续性得分 (需要K线)
-            klines = self.fetch_board_kline(b["code"], 10)
+            klines = self.fetch_board_kline(b.get("code", ""), 10)
             cont = self.analyze_continuity(klines)
             consec = cont.get("consecutive_up", 0)
             score_cont = min(100, consec * 25)  # 连涨4天=100
